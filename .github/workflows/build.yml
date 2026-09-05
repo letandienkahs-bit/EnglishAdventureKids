@@ -21,10 +21,10 @@ jobs:
           curl -L -o godot.zip \
             https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
           unzip -q godot.zip
-          sudo mv Godot_v4.4.1-stable_linux.x86_64/godot /usr/local/bin/godot
+          sudo mv Godot_v4.4.1-stable_linux.x86_64 /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
           godot --version
-
+          
       - name: Download Android export templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.4.1.stable
