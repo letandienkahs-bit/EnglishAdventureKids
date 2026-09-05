@@ -1,0 +1,263 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. JAVA 17
+      # ============================================================
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+
+      # ============================================================
+      # 3. ANDROID SDK
+      # ============================================================
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+
+      # ============================================================
+      # 4. INSTALL ANDROID SDK COMPONENTS
+      # ============================================================
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -e
+
+          sdkmanager --licenses > /dev/null || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.1"
+
+          echo "===== ANDROID SDK CHECK ====="
+
+          test -d "$ANDROID_SDK_ROOT/platforms/android-35"
+          echo "Android Platform 35: OK"
+
+          test -d "$ANDROID_SDK_ROOT/build-tools/35.0.1"
+          echo "Android Build Tools 35.0.1: OK"
+
+          test -d "$ANDROID_SDK_ROOT/platform-tools"
+          echo "Android Platform Tools: OK"
+
+
+      # ============================================================
+      # 5. DOWNLOAD GODOT 4.4.1
+      # ============================================================
+      - name: Download Godot 4.4.1
+        shell: bash
+        run: |
+          set -e
+
+          curl -fL -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
+
+          unzip -q godot.zip
+
+          sudo mv \
+            Godot_v4.4.1-stable_linux.x86_64 \
+            /usr/local/bin/godot
+
+          sudo chmod +x /usr/local/bin/godot
+
+          echo "===== GODOT VERSION ====="
+          godot --version
+
+
+      # ============================================================
+      # 6. DOWNLOAD GODOT EXPORT TEMPLATES
+      # ============================================================
+      - name: Install Godot export templates
+        shell: bash
+        run: |
+          set -e
+
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.4.1.stable"
+
+          mkdir -p "$TEMPLATE_DIR"
+
+          curl -fL -o godot_templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
+
+          mkdir -p /tmp/godot_templates
+
+          unzip -q godot_templates.tpz \
+            -d /tmp/godot_templates
+
+          cp -r \
+            /tmp/godot_templates/templates/* \
+            "$TEMPLATE_DIR/"
+
+          echo "===== EXPORT TEMPLATES ====="
+          ls -lah "$TEMPLATE_DIR"
+
+
+      # ============================================================
+      # 7. CONFIGURE GODOT GLOBAL SETTINGS
+      # ============================================================
+      - name: Configure Godot Android settings
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$HOME/.config/godot"
+
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          EOF
+
+          echo "===== GODOT SETTINGS ====="
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+
+
+      # ============================================================
+      # 8. ENVIRONMENT CHECK
+      # ============================================================
+      - name: Verify build environment
+        shell: bash
+        run: |
+          set -e
+
+          echo "===== JAVA ====="
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+
+          echo
+          echo "===== ANDROID ====="
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          echo
+          echo "===== GODOT ====="
+          godot --version
+
+          echo
+          echo "===== SDK ====="
+
+          test -d "$ANDROID_SDK_ROOT"
+          echo "SDK directory: OK"
+
+          test -d "$ANDROID_SDK_ROOT/platforms/android-35"
+          echo "Android 35: OK"
+
+          test -d "$ANDROID_SDK_ROOT/build-tools/35.0.1"
+          echo "Build Tools 35.0.1: OK"
+
+          echo
+          echo "===== PROJECT FILES ====="
+          test -f project.godot
+          echo "project.godot: OK"
+
+          test -f export_presets.cfg
+          echo "export_presets.cfg: OK"
+
+
+      # ============================================================
+      # 9. IMPORT PROJECT
+      # ============================================================
+      - name: Import Godot project
+        shell: bash
+        run: |
+          set -e
+
+          godot \
+            --headless \
+            --editor \
+            --path . \
+            --quit
+
+
+      # ============================================================
+      # 10. CHECK EXPORT PRESET
+      # ============================================================
+      - name: Check Android export preset
+        shell: bash
+        run: |
+          set -e
+
+          echo "===== EXPORT PRESET ====="
+          cat export_presets.cfg
+
+          echo
+          echo "===== GODOT EXPORT LIST ====="
+
+          godot \
+            --headless \
+            --path . \
+            --export-debug \
+            "Android" \
+            /tmp/test.apk \
+            --verbose || true
+
+
+      # ============================================================
+      # 11. BUILD APK
+      # ============================================================
+      - name: Build Android APK
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p build
+
+          rm -f build/EnglishAdventureKids.apk
+
+          echo "===== START ANDROID BUILD ====="
+
+          godot \
+            --headless \
+            --path . \
+            --verbose \
+            --export-debug \
+            "Android" \
+            build/EnglishAdventureKids.apk
+
+          echo
+          echo "===== APK RESULT ====="
+
+          test -f build/EnglishAdventureKids.apk
+
+          ls -lh build/EnglishAdventureKids.apk
+
+          echo "APK BUILD SUCCESS"
+
+
+      # ============================================================
+      # 12. UPLOAD APK
+      # ============================================================
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EnglishAdventureKids-Android
+          path: build/EnglishAdventureKids.apk
+          if-no-files-found: error
