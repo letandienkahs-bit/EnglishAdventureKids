@@ -1,0 +1,53 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Godot
+        run: |
+          curl -L -o godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          sudo mv Godot_v4.4.1-stable_linux.x86_64/godot /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --version
+
+      - name: Download Android export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.4.1.stable
+          curl -L -o templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
+          unzip -q templates.tpz -d /tmp/godot_templates
+          cp -r /tmp/godot_templates/templates/* \
+            ~/.local/share/godot/export_templates/4.4.1.stable/
+
+      - name: Import project
+        run: |
+          godot --headless --editor --path . --quit
+
+      - name: Build Android APK
+        run: |
+          mkdir -p build
+          godot --headless --path . \
+            --export-debug "Android" \
+            build/EnglishAdventureKids.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: EnglishAdventureKids-Android
+          path: build/EnglishAdventureKids.apk
+          if-no-files-found: error
