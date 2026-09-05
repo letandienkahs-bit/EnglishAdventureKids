@@ -176,13 +176,28 @@ jobs:
       # ========================================
       # 11. Build APK
       # ========================================
+      - name: Check Android configuration
+        run: |
+          echo "===== ANDROID ENV ====="
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "JAVA_HOME=$JAVA_HOME"
+      
+          echo "===== SDK ====="
+          test -d "$ANDROID_SDK_ROOT" && echo "SDK directory OK"
+          test -d "$ANDROID_SDK_ROOT/platforms/android-35" && echo "Android 35 OK"
+          test -d "$ANDROID_SDK_ROOT/build-tools/35.0.0" && echo "Build Tools OK"
+      
+          echo "===== GODOT SETTINGS ====="
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+      
+          echo "===== EXPORT PRESET ====="
+          cat export_presets.cfg
       - name: Build Android APK
-        shell: bash
         run: |
           set -e
-
           mkdir -p build
-          
+      
           godot --headless --path . \
             --verbose \
             --export-debug "Android" \
