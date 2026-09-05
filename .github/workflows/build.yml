@@ -109,23 +109,21 @@ jobs:
       # =========================
       # Build APK
       # =========================
-      - name: Check Godot Android configuration
+      - name: Check Android environment
         run: |
           echo "===== JAVA ====="
+          echo "JAVA_HOME=$JAVA_HOME"
           java -version
 
-          echo "===== ANDROID SDK ====="
+          echo "===== ANDROID ====="
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-          echo "===== ADB ====="
-          adb version || true
+          echo "===== SDK ====="
+          sdkmanager --list_installed || true
 
           echo "===== GODOT ====="
           godot --version
-
-          echo "===== EXPORT PRESETS ====="
-          cat export_presets.cfg
 
       - name: Build Android APK
         run: |
@@ -133,14 +131,18 @@ jobs:
 
           mkdir -p build
 
+          echo "===== EXPORT PRESETS ====="
+          sed -n '1,220p' export_presets.cfg
+
+          echo "===== START GODOT EXPORT ====="
+
           godot --headless \
             --path . \
             --export-debug "Android" \
             build/EnglishAdventureKids.apk
 
-          echo "===== APK RESULT ====="
-          ls -lh build/
-
+          echo "===== BUILD RESULT ====="
+          ls -lah build/
       # =========================
       # Upload APK
       # =========================
