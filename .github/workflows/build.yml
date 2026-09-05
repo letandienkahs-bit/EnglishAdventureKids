@@ -182,15 +182,11 @@ jobs:
           set -e
 
           mkdir -p build
-
-          godot \
-            --headless \
-            --path . \
+          
+          godot --headless --path . \
+            --verbose \
             --export-debug "Android" \
             build/EnglishAdventureKids.apk
-
-          echo "===== APK ====="
-          ls -lh build/EnglishAdventureKids.apk
 
 
       # ========================================
