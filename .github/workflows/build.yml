@@ -1,9 +1,10 @@
+```yaml
 name: Build Android APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -13,41 +14,118 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # =========================
+      # Checkout
+      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # =========================
+      # Java 17
+      # =========================
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # =========================
+      # Android SDK
+      # =========================
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Android environment
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+      # =========================
+      # Android packages
+      # =========================
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      # =========================
+      # Download Godot
+      # =========================
       - name: Download Godot
         run: |
           curl -L -o godot.zip \
             https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
+
           unzip -q godot.zip
+
           sudo mv Godot_v4.4.1-stable_linux.x86_64 /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
+
           godot --version
-          
+
+      # =========================
+      # Export templates
+      # =========================
       - name: Download Android export templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.4.1.stable
+
           curl -L -o templates.tpz \
             https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz
+
           unzip -q templates.tpz -d /tmp/godot_templates
+
           cp -r /tmp/godot_templates/templates/* \
             ~/.local/share/godot/export_templates/4.4.1.stable/
 
+      # =========================
+      # Verify environment
+      # =========================
+      - name: Check environment
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          java -version
+          adb version
+          sdkmanager --version
+
+      # =========================
+      # Import Godot project
+      # =========================
       - name: Import project
         run: |
-          godot --headless --editor --path . --quit
+          godot --headless \
+            --editor \
+            --path . \
+            --quit
 
+      # =========================
+      # Build APK
+      # =========================
       - name: Build Android APK
         run: |
           mkdir -p build
-          godot --headless --path . \
+
+          godot --headless \
+            --path . \
             --export-debug "Android" \
             build/EnglishAdventureKids.apk
 
+      # =========================
+      # Upload APK
+      # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: EnglishAdventureKids-Android
           path: build/EnglishAdventureKids.apk
           if-no-files-found: error
+```
